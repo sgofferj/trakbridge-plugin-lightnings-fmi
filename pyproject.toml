@@ -32,6 +32,8 @@ strict = true
 ignore_missing_imports = true
 exclude = "venv"
 disallow_subclassing_any = false
+explicit_package_bases = true
+mypy_path = "."
 
 [tool.pylint.messages_control]
 disable = [

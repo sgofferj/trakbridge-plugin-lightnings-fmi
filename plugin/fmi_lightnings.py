@@ -136,7 +136,8 @@ class FMILightningsPlugin(BaseGPSPlugin):
                 f"Strike time: {strike_time.strftime('%Y-%m-%dT%H:%M:%SZ')}\n"
                 "Säähavainnot: Ilmatieteenlaitos avoin data, CC-BY 4.0\n"
                 "Weather observations: "
-                "Finnish Meteorological Institute open data, CC-BY 4.0"
+                "Finnish Meteorological Institute open data, CC-BY 4.0\n"
+                "#weather #lightning"
             )
 
             locations.append(
