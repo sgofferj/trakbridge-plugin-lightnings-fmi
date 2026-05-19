@@ -10,12 +10,11 @@
 Finnish Meteorological Institute Lightning Plugin for TrakBridge
 """
 
-import asyncio
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any
 
 import aiohttp
-from fmiopendata.wfs import download_stored_query
 
 # pylint: disable=import-error
 from plugins.base_plugin import (
@@ -34,6 +33,18 @@ class FMILightningsPlugin(BaseGPSPlugin):
     """FMI Lightning integration"""
 
     PLUGIN_NAME = "lightnings_fmi"
+    WFS_BASE_URL = (
+        "https://opendata.fmi.fi/wfs?service=WFS&version=2.0.0&request=getFeature"
+        "&storedquery_id=fmi::observations::lightning::multipointcoverage"
+    )
+
+    # Namespaces for XML parsing
+    NS = {
+        "gml": "http://www.opengis.net/gml/3.2",
+        "gmlcov": "http://www.opengis.net/gmlcov/1.0",
+        "swe": "http://www.opengis.net/swe/2.0",
+        "om": "http://www.opengis.net/om/2.0",
+    }
 
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
@@ -93,36 +104,64 @@ class FMILightningsPlugin(BaseGPSPlugin):
             return "-256"
         return "-1"
 
-    # pylint: disable=unused-argument
-    async def fetch_locations(self, session: aiohttp.ClientSession) -> List[Dict[str, Any]]:
-        """Fetch lightning strikes from FMI."""
-        # pylint: disable=too-many-locals
-        config = self.get_decrypted_config()
-        history = int(config.get("history", 300))
-
-        end_time = datetime.now(timezone.utc)
-        start_time = end_time - timedelta(seconds=history)
-
+    async def _fetch_fmi_data(
+        self, session: aiohttp.ClientSession, start_time: datetime, end_time: datetime
+    ) -> bytes:
+        """Fetch raw XML data from FMI WFS."""
         start_time_str = start_time.strftime("%Y-%m-%dT%H:%M:%SZ")
         end_time_str = end_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+        url = f"{self.WFS_BASE_URL}&starttime={start_time_str}&endtime={end_time_str}"
+
+        async with session.get(url) as response:
+            if response.status != 200:
+                logger.error(f"FMI: Failed to fetch data: HTTP {response.status}")
+                return b""
+            return await response.read()
+
+    def _parse_lightning_xml(self, xml_content: bytes) -> List[Dict[str, Any]]:
+        """Parse lightning XML data."""
+        if not xml_content:
+            return []
 
         try:
-            # download_stored_query is synchronous, run in thread
-            obs = await asyncio.to_thread(
-                download_stored_query,
-                "fmi::observations::lightning::multipointcoverage",
-                args=[f"starttime={start_time_str}", f"endtime={end_time_str}"],
-            )
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            logger.error(f"FMI: Failed to fetch lightning data: {e}")
+            root = ET.fromstring(xml_content)
+        except ET.ParseError as e:
+            logger.error(f"FMI: Failed to parse XML: {e}")
             return []
+
+        # Find positions
+        pos_elem = root.find(".//gmlcov:positions", self.NS)
+        if pos_elem is None or not pos_elem.text:
+            logger.info("FMI: No lightning strikes found in this interval")
+            return []
+
+        positions = [float(x) for x in pos_elem.text.split()]
+        lats = positions[::3]
+        lons = positions[1::3]
+        times = positions[2::3]
+
+        # Find data tuples (multiplicity, peak_current, cloud_indicator, ellipse_major)
+        tuple_elem = root.find(".//gml:doubleOrNilReasonTupleList", self.NS)
+        if tuple_elem is None or not tuple_elem.text:
+            return []
+
+        data_rows = tuple_elem.text.strip().split("\n")
+        data = [[float(x) for x in row.split()] for row in data_rows]
+
+        # Find field names to know where ellipse_major is
+        fields = root.findall(".//swe:field", self.NS)
+        field_names = [f.attrib["name"] for f in fields]
+        try:
+            em_idx = field_names.index("ellipse_major")
+        except ValueError:
+            em_idx = -1
 
         locations = []
         now = datetime.now(timezone.utc)
 
-        for i, lat in enumerate(obs.latitudes):
-            strike_time = obs.times[i].replace(tzinfo=timezone.utc)
-            lon = obs.longitudes[i]
+        for i, lat in enumerate(lats):
+            strike_time = datetime.fromtimestamp(times[i], tz=timezone.utc)
+            lon = lons[i]
 
             uid = f"lightning-{strike_time.strftime('%Y%m%dT%H%M%SZ')}-" f"{lon}-{lat}"
 
@@ -130,7 +169,9 @@ class FMILightningsPlugin(BaseGPSPlugin):
             argb = self._get_argb_color(age_seconds)
 
             # Accuracy (Horizontal Error) in meters
-            he = obs.ellipse_major[i] * 1000 if obs.ellipse_major[i] else 100
+            he = 100.0
+            if em_idx != -1 and i < len(data):
+                he = data[i][em_idx] * 1000
 
             remarks = (
                 f"Strike time: {strike_time.strftime('%Y-%m-%dT%H:%M:%SZ')}\n"
@@ -146,12 +187,12 @@ class FMILightningsPlugin(BaseGPSPlugin):
                     "name": "Lightning strike",
                     "lat": lat,
                     "lon": lon,
-                    "hae": 5000,  # Default HAE from original feeder
+                    "hae": 5000,
                     "ce": he,
                     "le": 10,
                     "timestamp": now.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     "description": remarks,
-                    "cot_type": "a-o-G",  # Ground Combat (as in original)
+                    "cot_type": "a-o-G",
                     "custom_cot_attrib": {
                         "detail": {
                             "usericon": {
@@ -168,6 +209,21 @@ class FMILightningsPlugin(BaseGPSPlugin):
                 }
             )
 
+        return locations
+
+    async def fetch_locations(self, session: aiohttp.ClientSession) -> List[Dict[str, Any]]:
+        """Fetch lightning strikes from FMI."""
+        config = self.get_decrypted_config()
+        history = int(config.get("history", 300))
+
+        end_time = datetime.now(timezone.utc)
+        start_time = end_time - timedelta(seconds=history)
+
+        xml_content = await self._fetch_fmi_data(session, start_time, end_time)
+        # XML parsing is CPU bound, but for small lightning data it should be fine.
+        # Running in thread if it becomes an issue.
+        locations = self._parse_lightning_xml(xml_content)
+
         logger.info(f"FMI: Fetched {len(locations)} lightning strikes")
         return locations
 
@@ -179,17 +235,12 @@ class FMILightningsPlugin(BaseGPSPlugin):
     async def test_connection(self) -> Dict[str, Any]:
         """Test connection by fetching recent lightnings."""
         try:
-            # Use a short history for testing
-            end_time = datetime.now(timezone.utc)
-            start_time = end_time - timedelta(minutes=5)
-            start_time_str = start_time.strftime("%Y-%m-%dT%H:%M:%SZ")
-            end_time_str = end_time.strftime("%Y-%m-%dT%H:%M:%SZ")
-
-            await asyncio.to_thread(
-                download_stored_query,
-                "fmi::observations::lightning::multipointcoverage",
-                args=[f"starttime={start_time_str}", f"endtime={end_time_str}"],
-            )
-            return {"success": True, "message": "Successfully connected to FMI WFS"}
+            async with aiohttp.ClientSession() as session:
+                end_time = datetime.now(timezone.utc)
+                start_time = end_time - timedelta(minutes=5)
+                xml_content = await self._fetch_fmi_data(session, start_time, end_time)
+                if xml_content:
+                    return {"success": True, "message": "Successfully connected to FMI WFS"}
+                return {"success": False, "message": "Received empty response from FMI"}
         except Exception as e:  # pylint: disable=broad-exception-caught
             return {"success": False, "message": f"Connection failed: {e}"}
