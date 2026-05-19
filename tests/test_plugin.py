@@ -24,8 +24,16 @@ class MockBaseGPSPlugin:
         return self.config
 
 
+class MockPluginConfigField:
+    """Mock PluginConfigField"""
+
+    def __init__(self, **kwargs: Any):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+
 mock_base_plugin.BaseGPSPlugin = MockBaseGPSPlugin
-mock_base_plugin.PluginConfigField = MagicMock
+mock_base_plugin.PluginConfigField = MockPluginConfigField
 
 from plugin.fmi_lightnings import FMILightningsPlugin
 
@@ -39,6 +47,10 @@ def test_plugin_metadata() -> None:
     assert metadata["display_name"] == "FMI Lightnings Plugin"
     assert plugin.PLUGIN_NAME == "lightnings_fmi"
     assert plugin.plugin_name == "lightnings_fmi"
+
+    # Check default value in config fields
+    history_field = next(f for f in metadata["config_fields"] if f.name == "history")
+    assert history_field.default_value == 300
 
 
 def test_argb_color() -> None:

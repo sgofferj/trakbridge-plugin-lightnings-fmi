@@ -20,7 +20,7 @@ This plugin integrates lightning strike data from the Finnish Meteorological Ins
 Example environment variables for TrakBridge:
 ```
 PLUGIN_LIGHTNINGS_FMI_ENABLED=true
-PLUGIN_LIGHTNINGS_FMI_HISTORY=600
+PLUGIN_LIGHTNINGS_FMI_HISTORY=300
 ```
 
 ## Copyright and License

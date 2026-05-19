@@ -129,6 +129,17 @@ class FMILightningsPlugin(BaseGPSPlugin):
             logger.error(f"FMI: Failed to parse XML: {e}")
             return []
 
+        # Use the timestamp from the XML response as 'now' to avoid clock skew issues
+        now_str = root.get("timeStamp")
+        if now_str:
+            try:
+                # fromisoformat with Z support is 3.11+, so use strptime for 3.10
+                now = datetime.strptime(now_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+            except ValueError:
+                now = datetime.now(timezone.utc)
+        else:
+            now = datetime.now(timezone.utc)
+
         # Find positions
         pos_elem = root.find(".//gmlcov:positions", self.NS)
         if pos_elem is None or not pos_elem.text:
@@ -157,7 +168,6 @@ class FMILightningsPlugin(BaseGPSPlugin):
             em_idx = -1
 
         locations = []
-        now = datetime.now(timezone.utc)
 
         for i, lat in enumerate(lats):
             strike_time = datetime.fromtimestamp(times[i], tz=timezone.utc)
