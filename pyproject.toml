@@ -1,0 +1,44 @@
+[tool.poetry]
+name = "trakbridge-plugin-lightnings-fmi"
+version = "0.1.0"
+description = "Finnish Meteorological Institute Lightning plugin for TrakBridge"
+authors = ["Stefan Gofferje <stefan@gofferje.net>"]
+license = "GPL-3.0-or-later"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.10"
+fmiopendata = "^0.3.0"
+aiohttp = "^3.9.0"
+
+[tool.poetry.group.dev.dependencies]
+black = "^26.3.1"
+mypy = "^1.8.0"
+pylint = "^3.0.0"
+pip-audit = "^2.7.0"
+pytest = "^9.0.3"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 100
+target-version = ['py310']
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+ignore_missing_imports = true
+exclude = "venv"
+disallow_subclassing_any = false
+
+[tool.pylint.messages_control]
+disable = [
+    "C0114", # missing-module-docstring
+    "C0115", # missing-class-docstring
+    "C0116", # missing-function-docstring
+]
+
+[tool.pylint.format]
+max-line-length = 100
