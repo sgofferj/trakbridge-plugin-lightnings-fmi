@@ -5,10 +5,11 @@ __pycache__/
 .mypy_cache/
 poetry.lock
 .env
-# As per GEMINI.md:
+# As per AGENTS.md:
 cert/
 *.pem
 *.key
 *.p12
 *.pfx
-GEMINI.md
+AGENTS.md
+dist/

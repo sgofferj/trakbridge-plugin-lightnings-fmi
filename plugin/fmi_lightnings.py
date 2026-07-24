@@ -12,7 +12,7 @@ Finnish Meteorological Institute Lightning Plugin for TrakBridge
 
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
-from typing import List, Dict, Any
+from typing import List, Dict, Any, cast
 
 import aiohttp
 
@@ -203,6 +203,7 @@ class FMILightningsPlugin(BaseGPSPlugin):
                     "timestamp": now.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     "description": remarks,
                     "cot_type": "a-o-G",
+                    "strike_time": strike_time,
                     "custom_cot_attrib": {
                         "detail": {
                             "usericon": {
@@ -218,6 +219,12 @@ class FMILightningsPlugin(BaseGPSPlugin):
                     },
                 }
             )
+
+        # Sort locations by strike time (oldest first)
+        locations.sort(key=lambda x: cast(datetime, x["strike_time"]))
+        # Remove the temporary strike_time key
+        for loc in locations:
+            loc.pop("strike_time")
 
         return locations
 

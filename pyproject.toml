@@ -4,16 +4,18 @@ version = "0.1.0"
 description = "Finnish Meteorological Institute Lightning plugin for TrakBridge"
 authors = ["Stefan Gofferje <stefan@gofferje.net>"]
 license = "GPL-3.0-or-later"
-package-mode = false
+packages = [{include = "plugin"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
 aiohttp = "^3.9.0"
+trakbridge-plugin-sdk = ">=2.0.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "^26.3.1"
 mypy = "^1.8.0"
 pylint = "^3.0.0"
+pyyaml = "*"
 pip-audit = "^2.7.0"
 pytest = "^9.0.3"
 
@@ -39,6 +41,7 @@ disable = [
     "C0114", # missing-module-docstring
     "C0115", # missing-class-docstring
     "C0116", # missing-function-docstring
+    "too-many-locals",
 ]
 
 [tool.pylint.format]
