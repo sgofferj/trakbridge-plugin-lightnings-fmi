@@ -1,6 +1,6 @@
 id: lightnings_fmi
 name: FMI Lightnings Plugin
-version: "0.1.0"
+version: "0.2.0"
 entry_point: plugin/fmi_lightnings.py
 class_name: FMILightningsPlugin
 description: "Lightning strike data from Finnish Meteorological Institute"

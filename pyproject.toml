@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "trakbridge-plugin-lightnings-fmi"
-version = "0.1.0"
+version = "0.2.0"
 description = "Finnish Meteorological Institute Lightning plugin for TrakBridge"
 authors = ["Stefan Gofferje <stefan@gofferje.net>"]
 license = "GPL-3.0-or-later"
