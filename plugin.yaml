@@ -4,6 +4,7 @@ version: "0.1.0"
 entry_point: plugin/fmi_lightnings.py
 class_name: FMILightningsPlugin
 description: "Lightning strike data from Finnish Meteorological Institute"
+icon: "fas fa-bolt"
 author: Stefan Gofferje
 plugin_type: gps
 tier: community
