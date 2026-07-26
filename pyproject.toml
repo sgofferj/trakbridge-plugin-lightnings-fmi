@@ -9,7 +9,7 @@ packages = [{include = "plugin"}]
 [tool.poetry.dependencies]
 python = "^3.10"
 aiohttp = "^3.9.0"
-trakbridge-plugin-sdk = ">=2.0.0"
+trakbridge-plugin-sdk = ">=1.1.0,<2.0.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "^26.3.1"
